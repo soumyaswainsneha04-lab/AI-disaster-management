@@ -105,8 +105,15 @@ _ALLOW_LAN_ORIGINS = os.getenv(
     "true",
 ).strip().lower() not in {"0", "false", "no", "off"}
 
+_DEPLOYED_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("DISASTER_AI_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 _CORS_OPTIONS = {
     "allow_origins": [
+        *_DEPLOYED_ORIGINS,
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
