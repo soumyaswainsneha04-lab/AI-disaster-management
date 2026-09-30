@@ -1,0 +1,243 @@
+{
+  "depots": [
+    {
+      "depot_id": "DELHI",
+      "name": "Delhi NCR Relief Depot",
+      "city": "New Delhi",
+      "state": "Delhi",
+      "region": "North",
+      "latitude": 28.6139,
+      "longitude": 77.209,
+      "resources": {
+        "food_packets": 32000,
+        "water_litres": 90000,
+        "medical_kits": 2400,
+        "shelter_capacity": 9000,
+        "rescue_vehicles": 48,
+        "personnel": 680
+      }
+    },
+    {
+      "depot_id": "LUCKNOW",
+      "name": "Lucknow Relief Depot",
+      "city": "Lucknow",
+      "state": "Uttar Pradesh",
+      "region": "North",
+      "latitude": 26.8467,
+      "longitude": 80.9462,
+      "resources": {
+        "food_packets": 25000,
+        "water_litres": 70000,
+        "medical_kits": 1800,
+        "shelter_capacity": 7000,
+        "rescue_vehicles": 36,
+        "personnel": 520
+      }
+    },
+    {
+      "depot_id": "PATNA",
+      "name": "Patna Relief Depot",
+      "city": "Patna",
+      "state": "Bihar",
+      "region": "East",
+      "latitude": 25.5941,
+      "longitude": 85.1376,
+      "resources": {
+        "food_packets": 24000,
+        "water_litres": 68000,
+        "medical_kits": 1700,
+        "shelter_capacity": 7200,
+        "rescue_vehicles": 34,
+        "personnel": 500
+      }
+    },
+    {
+      "depot_id": "KOLKATA",
+      "name": "Kolkata Relief Depot",
+      "city": "Kolkata",
+      "state": "West Bengal",
+      "region": "East",
+      "latitude": 22.5726,
+      "longitude": 88.3639,
+      "resources": {
+        "food_packets": 30000,
+        "water_litres": 82000,
+        "medical_kits": 2100,
+        "shelter_capacity": 8500,
+        "rescue_vehicles": 42,
+        "personnel": 610
+      }
+    },
+    {
+      "depot_id": "BHUBANESWAR",
+      "name": "Bhubaneswar Relief Depot",
+      "city": "Bhubaneswar",
+      "state": "Odisha",
+      "region": "East",
+      "latitude": 20.2961,
+      "longitude": 85.8245,
+      "resources": {
+        "food_packets": 28000,
+        "water_litres": 76000,
+        "medical_kits": 1950,
+        "shelter_capacity": 8000,
+        "rescue_vehicles": 40,
+        "personnel": 580
+      }
+    },
+    {
+      "depot_id": "GUWAHATI",
+      "name": "Guwahati Relief Depot",
+      "city": "Guwahati",
+      "state": "Assam",
+      "region": "North-East",
+      "latitude": 26.1445,
+      "longitude": 91.7362,
+      "resources": {
+        "food_packets": 22000,
+        "water_litres": 62000,
+        "medical_kits": 1600,
+        "shelter_capacity": 6500,
+        "rescue_vehicles": 35,
+        "personnel": 500
+      }
+    },
+    {
+      "depot_id": "AHMEDABAD",
+      "name": "Ahmedabad Relief Depot",
+      "city": "Ahmedabad",
+      "state": "Gujarat",
+      "region": "West",
+      "latitude": 23.0225,
+      "longitude": 72.5714,
+      "resources": {
+        "food_packets": 26000,
+        "water_litres": 72000,
+        "medical_kits": 1800,
+        "shelter_capacity": 7000,
+        "rescue_vehicles": 37,
+        "personnel": 530
+      }
+    },
+    {
+      "depot_id": "MUMBAI",
+      "name": "Mumbai Relief Depot",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "region": "West",
+      "latitude": 19.076,
+      "longitude": 72.8777,
+      "resources": {
+        "food_packets": 31000,
+        "water_litres": 86000,
+        "medical_kits": 2300,
+        "shelter_capacity": 8800,
+        "rescue_vehicles": 46,
+        "personnel": 650
+      }
+    },
+    {
+      "depot_id": "BHOPAL",
+      "name": "Bhopal Relief Depot",
+      "city": "Bhopal",
+      "state": "Madhya Pradesh",
+      "region": "Central",
+      "latitude": 23.2599,
+      "longitude": 77.4126,
+      "resources": {
+        "food_packets": 24000,
+        "water_litres": 68000,
+        "medical_kits": 1700,
+        "shelter_capacity": 7000,
+        "rescue_vehicles": 35,
+        "personnel": 510
+      }
+    },
+    {
+      "depot_id": "HYDERABAD",
+      "name": "Hyderabad Relief Depot",
+      "city": "Hyderabad",
+      "state": "Telangana",
+      "region": "South-Central",
+      "latitude": 17.385,
+      "longitude": 78.4867,
+      "resources": {
+        "food_packets": 27000,
+        "water_litres": 74000,
+        "medical_kits": 1900,
+        "shelter_capacity": 7600,
+        "rescue_vehicles": 39,
+        "personnel": 560
+      }
+    },
+    {
+      "depot_id": "VISAKHAPATNAM",
+      "name": "Visakhapatnam Relief Depot",
+      "city": "Visakhapatnam",
+      "state": "Andhra Pradesh",
+      "region": "East Coast",
+      "latitude": 17.6868,
+      "longitude": 83.2185,
+      "resources": {
+        "food_packets": 25000,
+        "water_litres": 70000,
+        "medical_kits": 1750,
+        "shelter_capacity": 7200,
+        "rescue_vehicles": 36,
+        "personnel": 520
+      }
+    },
+    {
+      "depot_id": "CHENNAI",
+      "name": "Chennai Relief Depot",
+      "city": "Chennai",
+      "state": "Tamil Nadu",
+      "region": "South",
+      "latitude": 13.0827,
+      "longitude": 80.2707,
+      "resources": {
+        "food_packets": 30000,
+        "water_litres": 82000,
+        "medical_kits": 2150,
+        "shelter_capacity": 8400,
+        "rescue_vehicles": 44,
+        "personnel": 620
+      }
+    },
+    {
+      "depot_id": "BENGALURU",
+      "name": "Bengaluru Relief Depot",
+      "city": "Bengaluru",
+      "state": "Karnataka",
+      "region": "South",
+      "latitude": 12.9716,
+      "longitude": 77.5946,
+      "resources": {
+        "food_packets": 28000,
+        "water_litres": 78000,
+        "medical_kits": 2050,
+        "shelter_capacity": 8000,
+        "rescue_vehicles": 41,
+        "personnel": 590
+      }
+    },
+    {
+      "depot_id": "KOCHI",
+      "name": "Kochi Relief Depot",
+      "city": "Kochi",
+      "state": "Kerala",
+      "region": "South-West",
+      "latitude": 9.9312,
+      "longitude": 76.2673,
+      "resources": {
+        "food_packets": 23000,
+        "water_litres": 66000,
+        "medical_kits": 1650,
+        "shelter_capacity": 6800,
+        "rescue_vehicles": 34,
+        "personnel": 490
+      }
+    }
+  ],
+  "history": []
+}

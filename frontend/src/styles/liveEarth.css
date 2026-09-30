@@ -1,0 +1,242 @@
+.live-earth-page {
+  --le-navy: #0b3558;
+  --le-teal: #0e9f8e;
+  --le-cyan: #20b8c9;
+  --le-amber: #f0a43c;
+}
+
+.live-earth-hero {
+  margin: 18px 0;
+  padding: 24px 26px;
+  border-radius: 18px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 82% 20%, rgba(32,184,201,.24), transparent 32%),
+    linear-gradient(135deg, #09253f, #0b4865 60%, #0d766e);
+  box-shadow: 0 14px 34px rgba(12,45,70,.14);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.live-earth-eyebrow {
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  opacity: .78;
+  margin-bottom: 7px;
+}
+
+.live-earth-hero h2 {
+  margin: 0 0 6px;
+  font-size: 25px;
+}
+
+.live-earth-hero p {
+  margin: 0;
+  max-width: 760px;
+  color: #d8edf1;
+  line-height: 1.55;
+  font-size: 13px;
+}
+
+.live-earth-status {
+  white-space: nowrap;
+  padding: 10px 13px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.09);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .8px;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #4bd39f;
+  box-shadow: 0 0 0 5px rgba(75,211,159,.12);
+}
+
+.live-earth-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.live-earth-layer-buttons {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.live-earth-layer-buttons button {
+  border: 1px solid #d5e0e8;
+  background: #fff;
+  color: #29465d;
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.live-earth-layer-buttons button:hover,
+.live-earth-layer-buttons button.active {
+  border-color: var(--le-teal);
+  color: #075d57;
+  background: #ecfbf8;
+}
+
+.live-earth-map-panel {
+  overflow: hidden;
+}
+
+.live-earth-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.live-earth-map-header h3 {
+  margin: 0 0 5px;
+}
+
+.live-earth-map-header p {
+  margin: 0;
+  color: #708095;
+  font-size: 12px;
+}
+
+.live-earth-counts {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.live-earth-counts span {
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #f3f7fa;
+  border: 1px solid #e4edf2;
+  color: #627387;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.live-earth-counts strong {
+  color: #173b58;
+  margin-right: 3px;
+}
+
+.live-earth-map {
+  height: min(67vh, 650px);
+  min-height: 430px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #dce7ed;
+  background: #dceaf0;
+}
+
+.live-earth-map .leaflet-control-attribution {
+  font-size: 9px;
+}
+
+.live-earth-popup {
+  line-height: 1.5;
+  font-size: 12px;
+}
+
+.live-earth-source-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 13px;
+  margin-top: 14px;
+}
+
+.live-earth-source-card {
+  background: #fff;
+  border: 1px solid #e2eaf0;
+  border-radius: 13px;
+  padding: 16px;
+  box-shadow: 0 5px 18px rgba(20,45,70,.045);
+}
+
+.live-earth-source-card > span {
+  display: block;
+  color: #0b877d;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  margin-bottom: 7px;
+}
+
+.live-earth-source-card h3 {
+  margin: 0 0 7px;
+  color: #173b58;
+  font-size: 15px;
+}
+
+.live-earth-source-card p {
+  margin: 0 0 12px;
+  color: #6d7d8e;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.live-earth-source-card a {
+  color: #087f78;
+  font-size: 11px;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.live-earth-source-card a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .live-earth-source-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .live-earth-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .live-earth-map-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .live-earth-counts {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .live-earth-map {
+    min-height: 360px;
+    height: 62vh;
+  }
+
+  .live-earth-hero {
+    padding: 19px;
+  }
+
+  .live-earth-hero h2 {
+    font-size: 21px;
+  }
+}

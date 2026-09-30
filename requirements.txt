@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pandas
+numpy
+scikit-learn
+pydantic
+email-validator
+ortools==9.15.6755
+google-auth>=2.35.0
+requests>=2.31.0

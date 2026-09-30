@@ -1,0 +1,24 @@
+[
+  {
+    "report_id": "77192f04",
+    "timestamp": "2026-09-22T15:00:21.343628+00:00",
+    "row_id": 11,
+    "injured_count": 0,
+    "missing_count": 0,
+    "reported_severity": 0.5,
+    "road_status": "OPEN",
+    "notes": "",
+    "baseline_demand": {
+      "food_packets": 123,
+      "water_litres": 393,
+      "medical_kits": 7,
+      "shelter_people": 65
+    },
+    "updated_dynamic_demand": {
+      "food_packets": 135,
+      "water_litres": 432,
+      "medical_kits": 8,
+      "shelter_people": 72
+    }
+  }
+]
