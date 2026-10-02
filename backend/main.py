@@ -23,30 +23,57 @@ from ortools.linear_solver import pywraplp
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 from pydantic import BaseModel, Field, EmailStr
 
-from .security_db import (
-    CURRENT_USER,
-    ALLOWED_ROLES,
-    PUBLIC_REQUEST_ROLES,
-    authenticate_user_detailed,
-    authenticate_google_user,
-    create_access_token,
-    decode_access_token,
-    get_user_by_id,
-    get_public_user_by_email,
-    list_users as db_list_users,
-    list_field_teams as db_list_field_teams,
-    create_user as db_create_user,
-    register_user as db_register_user,
-    register_google_user as db_register_google_user,
-    update_user as db_update_user,
-    set_user_password as db_set_user_password,
-    change_own_password as db_change_own_password,
-    request_password_reset as db_request_password_reset,
-    list_audit_logs as db_list_audit_logs,
-    load_app_state,
-    save_app_state,
-    audit,
-)
+try:
+    from .security_db import (
+        CURRENT_USER,
+        ALLOWED_ROLES,
+        PUBLIC_REQUEST_ROLES,
+        authenticate_user_detailed,
+        authenticate_google_user,
+        create_access_token,
+        decode_access_token,
+        get_user_by_id,
+        get_public_user_by_email,
+        list_users as db_list_users,
+        list_field_teams as db_list_field_teams,
+        create_user as db_create_user,
+        register_user as db_register_user,
+        register_google_user as db_register_google_user,
+        update_user as db_update_user,
+        set_user_password as db_set_user_password,
+        change_own_password as db_change_own_password,
+        request_password_reset as db_request_password_reset,
+        list_audit_logs as db_list_audit_logs,
+        load_app_state,
+        save_app_state,
+        audit,
+    )
+except ImportError:
+    # Vercel's FastAPI entrypoint imports main.py as a top-level module.
+    from security_db import (
+        CURRENT_USER,
+        ALLOWED_ROLES,
+        PUBLIC_REQUEST_ROLES,
+        authenticate_user_detailed,
+        authenticate_google_user,
+        create_access_token,
+        decode_access_token,
+        get_user_by_id,
+        get_public_user_by_email,
+        list_users as db_list_users,
+        list_field_teams as db_list_field_teams,
+        create_user as db_create_user,
+        register_user as db_register_user,
+        register_google_user as db_register_google_user,
+        update_user as db_update_user,
+        set_user_password as db_set_user_password,
+        change_own_password as db_change_own_password,
+        request_password_reset as db_request_password_reset,
+        list_audit_logs as db_list_audit_logs,
+        load_app_state,
+        save_app_state,
+        audit,
+    )
 
 
 # ============================================================
@@ -105,15 +132,8 @@ _ALLOW_LAN_ORIGINS = os.getenv(
     "true",
 ).strip().lower() not in {"0", "false", "no", "off"}
 
-_DEPLOYED_ORIGINS = [
-    origin.strip().rstrip("/")
-    for origin in os.getenv("DISASTER_AI_CORS_ORIGINS", "").split(",")
-    if origin.strip()
-]
-
 _CORS_OPTIONS = {
     "allow_origins": [
-        *_DEPLOYED_ORIGINS,
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
@@ -323,15 +343,46 @@ async def authentication_middleware(request: Request, call_next):
         CURRENT_USER.reset(token_ctx)
 
 
+# Vercel Services routes the frontend API through /api. The existing
+# backend routes intentionally keep their original paths (/health, /auth/*,
+# /disasters/*, ...), so strip the deployment-only /api prefix before
+# FastAPI route matching. This middleware is registered after authentication
+# so it executes first and the auth layer sees the normalized route.
+@app.middleware("http")
+async def vercel_api_prefix_middleware(request: Request, call_next):
+    if IS_VERCEL and request.scope.get("path", "").startswith("/api"):
+        path = request.scope["path"]
+        request.scope["path"] = path[4:] or "/"
+    return await call_next(request)
+
+
 # ============================================================
 # PATHS
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_PATH = BASE_DIR / "data" / "disaster_Dataset_FEATURED.csv"
-MODEL_DIR = BASE_DIR / "model"
+BACKEND_MODEL_DIR = Path(__file__).resolve().parent / "model"
+MODEL_DIR = BACKEND_MODEL_DIR if BACKEND_MODEL_DIR.exists() else BASE_DIR / "model"
 FEATURE_PATH = MODEL_DIR / "all_disaster_feature_names.txt"
 STATE_DIR = BASE_DIR / "data" / "operations_state"
+
+# Vercel deployment artifact configuration.
+# Large dataset/model binaries are kept outside GitHub and downloaded only
+# when the deployed backend needs them. Local development still uses the
+# original files when they are present.
+IS_VERCEL = bool(os.getenv("VERCEL"))
+DATASET_URL = os.getenv("DISASTER_AI_DATASET_URL", "").strip()
+FEATURES_URL = os.getenv("DISASTER_AI_FEATURES_URL", "").strip()
+MODEL_URLS = {
+    "Flood": os.getenv("DISASTER_AI_MODEL_FLOOD_URL", "").strip(),
+    "Cyclone": os.getenv("DISASTER_AI_MODEL_CYCLONE_URL", "").strip(),
+    "Earthquake": os.getenv("DISASTER_AI_MODEL_EARTHQUAKE_URL", "").strip(),
+    "Wildfire": os.getenv("DISASTER_AI_MODEL_WILDFIRE_URL", "").strip(),
+    "Landslide": os.getenv("DISASTER_AI_MODEL_LANDSLIDE_URL", "").strip(),
+}
+REMOTE_CACHE_DIR = Path("/tmp/disaster-ai") if IS_VERCEL else STATE_DIR / "remote_cache"
+REMOTE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 INVENTORY_PATH = STATE_DIR / "resource_inventory.json"
 DEPOT_INVENTORY_PATH = STATE_DIR / "india_resource_depots.json"
 MISSIONS_PATH = STATE_DIR / "missions.json"
@@ -370,19 +421,82 @@ def model_path_for(disaster_type: str) -> Path:
 # LOAD DATASET
 # ============================================================
 
-if not DATA_PATH.exists():
-    raise RuntimeError(f"Dataset not found: {DATA_PATH}")
+def _download_remote_file(url: str, destination: Path, label: str) -> Path:
+    """Download a deployment artifact once into the function's temporary cache."""
+    if destination.exists() and destination.stat().st_size > 0:
+        return destination
 
-if not FEATURE_PATH.exists():
+    if not url:
+        raise RuntimeError(
+            f"{label} is missing. Configure the corresponding deployment URL."
+        )
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_suffix(destination.suffix + ".part")
+
+    try:
+        with requests.get(
+            url,
+            stream=True,
+            timeout=(15, 600),
+            allow_redirects=True,
+        ) as response:
+            response.raise_for_status()
+            with temporary.open("wb") as output:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        output.write(chunk)
+
+        temporary.replace(destination)
+        return destination
+    except Exception:
+        try:
+            temporary.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
+
+
+def _resolve_dataset_path() -> Path:
+    if DATA_PATH.exists():
+        return DATA_PATH
+
+    if DATASET_URL:
+        return _download_remote_file(
+            DATASET_URL,
+            REMOTE_CACHE_DIR / "disaster_Dataset_FEATURED.csv",
+            "Disaster dataset",
+        )
+
     raise RuntimeError(
-        f"Feature list not found: {FEATURE_PATH}. "
-        "Run 03_train_all_disaster_models.py first."
+        f"Dataset not found: {DATA_PATH}. "
+        "Set DISASTER_AI_DATASET_URL for the deployed backend."
     )
 
 
-df = pd.read_csv(DATA_PATH).reset_index(drop=True)
+def _resolve_features_path() -> Path:
+    if FEATURE_PATH.exists():
+        return FEATURE_PATH
 
-with open(FEATURE_PATH, "r", encoding="utf-8") as file:
+    if FEATURES_URL:
+        return _download_remote_file(
+            FEATURES_URL,
+            REMOTE_CACHE_DIR / "all_disaster_feature_names.txt",
+            "Feature list",
+        )
+
+    raise RuntimeError(
+        f"Feature list not found: {FEATURE_PATH}. "
+        "Set DISASTER_AI_FEATURES_URL for the deployed backend."
+    )
+
+
+RESOLVED_DATA_PATH = _resolve_dataset_path()
+RESOLVED_FEATURE_PATH = _resolve_features_path()
+
+df = pd.read_csv(RESOLVED_DATA_PATH).reset_index(drop=True)
+
+with open(RESOLVED_FEATURE_PATH, "r", encoding="utf-8") as file:
     features = [line.strip() for line in file if line.strip()]
 
 missing_features = [feature for feature in features if feature not in df.columns]
@@ -406,10 +520,19 @@ model_paths = {
     disaster_type: model_path_for(disaster_type)
     for disaster_type in SUPPORTED_DISASTERS
 }
+
+
+def _model_is_available(disaster_type: str) -> bool:
+    path = model_paths.get(disaster_type)
+    if path is not None and path.exists():
+        return True
+    return bool(MODEL_URLS.get(disaster_type))
+
+
 missing_models = [
     disaster_type
-    for disaster_type, path in model_paths.items()
-    if not path.exists()
+    for disaster_type in SUPPORTED_DISASTERS
+    if not _model_is_available(disaster_type)
 ]
 
 
@@ -915,13 +1038,10 @@ def get_disaster_type(row) -> str:
 
 def get_model_for_disaster(disaster_type: str):
     path = model_paths.get(disaster_type)
-    if path is None or not path.exists():
+    if path is None:
         raise HTTPException(
             status_code=503,
-            detail=(
-                f"No trained resource model is available for {disaster_type}. "
-                "Run 03_train_all_disaster_models.py first."
-            ),
+            detail=f"Unsupported disaster model: {disaster_type}.",
         )
 
     cached = models.get(disaster_type)
@@ -934,12 +1054,27 @@ def get_model_for_disaster(disaster_type: str):
             return cached
 
         try:
+            if not path.exists():
+                remote_url = MODEL_URLS.get(disaster_type, "")
+                if not remote_url:
+                    raise FileNotFoundError(
+                        f"No local model and no remote URL configured for {disaster_type}."
+                    )
+
+                path = _download_remote_file(
+                    remote_url,
+                    REMOTE_CACHE_DIR / path.name,
+                    f"{disaster_type} resource model",
+                )
+
             with path.open("rb") as file:
                 cached = pickle.load(file)
+
             if hasattr(cached, "n_jobs"):
                 # Prediction for one row is usually faster with a single worker
                 # and avoids spawning a large thread pool per API request.
                 cached.n_jobs = 1
+
             models[disaster_type] = cached
             return cached
         except Exception as exc:
@@ -2465,7 +2600,8 @@ def model_explainability(
 # FINAL PROJECT OPERATIONS MODULES
 # ============================================================
 
-STATE_DIR.mkdir(parents=True, exist_ok=True)
+if not IS_VERCEL:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _utc_now():
@@ -3784,7 +3920,7 @@ def feed_status():
         "local_dataset": {
             "status": "READY",
             "records": len(df),
-            "source": f"{DATA_PATH.name} (India operating region)",
+            "source": f"{RESOLVED_DATA_PATH.name} (India operating region)",
         },
         "usgs_earthquakes": {
             "status": "LIVE_ON_REQUEST",
@@ -4940,6 +5076,16 @@ def _load_local_translation_model():
     global _TRANSLATION_MODEL
     global _TRANSLATION_TOKENIZER
 
+    if (
+        IS_VERCEL
+        and os.getenv("DISASTER_AI_ENABLE_LOCAL_TRANSLATION", "").strip().lower()
+        not in {"1", "true", "yes", "on"}
+    ):
+        raise RuntimeError(
+            "Local NLLB translation is disabled on Vercel. "
+            "The frontend reviewed translation dictionary remains active."
+        )
+
     if _TRANSLATION_MODEL is not None and _TRANSLATION_TOKENIZER is not None:
         return _TRANSLATION_TOKENIZER, _TRANSLATION_MODEL
 
@@ -5114,15 +5260,25 @@ def public_translate_batch(request: TranslationBatchRequest):
         seen.add(clean)
         unique_texts.append(clean)
 
-    if language == "en":
+    if language == "en" or (
+        IS_VERCEL
+        and os.getenv("DISASTER_AI_ENABLE_LOCAL_TRANSLATION", "").strip().lower()
+        not in {"1", "true", "yes", "on"}
+    ):
         return {
             "language": language,
             "translations": {
                 text: text
                 for text in unique_texts
             },
-            "provider": "local",
-            "model": LOCAL_TRANSLATION_MODEL,
+            "translated_count": 0,
+            "requested_count": len(unique_texts),
+            "provider": "frontend-local",
+            "model": None,
+            "note": (
+                "Vercel deployment uses the reviewed frontend translation "
+                "dictionary. Local NLLB inference remains enabled for local development."
+            ),
         }
 
     try:
@@ -5204,6 +5360,17 @@ def _start_translation_warmup():
     global _TRANSLATION_WARMUP_STARTED
 
     if _TRANSLATION_WARMUP_STARTED:
+        return
+
+    if (
+        IS_VERCEL
+        and os.getenv("DISASTER_AI_ENABLE_LOCAL_TRANSLATION", "").strip().lower()
+        not in {"1", "true", "yes", "on"}
+    ):
+        _TRANSLATION_WARMUP_STARTED = True
+        _TRANSLATION_WARMUP_ERROR = (
+            "Local NLLB translation disabled for Vercel deployment."
+        )
         return
 
     _TRANSLATION_WARMUP_STARTED = True

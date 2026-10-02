@@ -7,6 +7,13 @@ import json
 import os
 import secrets
 import sqlite3
+
+try:
+    import psycopg
+    from psycopg.rows import dict_row
+except ImportError:  # Optional locally; required only when DATABASE_URL is configured.
+    psycopg = None
+    dict_row = None
 import time
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -16,9 +23,19 @@ from typing import Any
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATE_DIR = BASE_DIR / "data" / "operations_state"
-STATE_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = STATE_DIR / "disaster_ai.db"
 SECRET_PATH = STATE_DIR / ".jwt_secret"
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+USE_POSTGRES = bool(DATABASE_URL)
+
+if not USE_POSTGRES and not os.getenv("VERCEL"):
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+
+if USE_POSTGRES and psycopg is None:
+    raise RuntimeError(
+        "DATABASE_URL is configured, but psycopg is not installed. "
+        'Add "psycopg[binary]" to requirements.txt.'
+    )
 
 CURRENT_USER: ContextVar[dict | None] = ContextVar("current_user", default=None)
 
@@ -31,17 +48,67 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _connect() -> sqlite3.Connection:
+class _ConnectionProxy:
+    """Small compatibility layer so the existing SQLite code can use Postgres."""
+
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, sql, params=None):
+        sql = _adapt_sql(sql)
+        return self._connection.execute(sql, params or ())
+
+    def executescript(self, script):
+        if not USE_POSTGRES:
+            return self._connection.executescript(script)
+
+        for statement in script.split(";"):
+            statement = statement.strip()
+            if statement:
+                self._connection.execute(_adapt_sql(statement))
+        return self
+
+    def __enter__(self):
+        self._connection.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return self._connection.__exit__(exc_type, exc_value, traceback)
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+
+def _adapt_sql(sql: str) -> str:
+    return sql.replace("?", "%s") if USE_POSTGRES else sql
+
+
+def _connect():
+    if USE_POSTGRES:
+        return _ConnectionProxy(
+            psycopg.connect(
+                DATABASE_URL,
+                row_factory=dict_row,
+                connect_timeout=10,
+            )
+        )
+
     connection = sqlite3.connect(DB_PATH, timeout=30)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+    return _ConnectionProxy(connection)
 
 
 def _load_secret() -> bytes:
     env_secret = os.getenv("DISASTER_AI_SECRET_KEY")
     if env_secret:
         return env_secret.encode("utf-8")
+
+    if USE_POSTGRES or os.getenv("VERCEL"):
+        raise RuntimeError(
+            "DISASTER_AI_SECRET_KEY must be configured when the backend "
+            "runs on Vercel/Postgres."
+        )
 
     if not SECRET_PATH.exists():
         SECRET_PATH.write_text(secrets.token_urlsafe(64), encoding="utf-8")
@@ -95,11 +162,25 @@ def verify_password(password: str, encoded: str) -> bool:
         return False
 
 
-def _ensure_column(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
-    columns = {
-        row["name"]
-        for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
-    }
+def _ensure_column(conn, table: str, column: str, definition: str) -> None:
+    if USE_POSTGRES:
+        columns = {
+            row["column_name"]
+            for row in conn.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema='public' AND table_name=? 
+                """,
+                (table,),
+            ).fetchall()
+        }
+    else:
+        columns = {
+            row["name"]
+            for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+
     if column not in columns:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
@@ -127,42 +208,77 @@ def _public_user(row: sqlite3.Row | dict) -> dict:
 
 
 def init_database() -> None:
+    if USE_POSTGRES:
+        schema = """
+        CREATE TABLE IF NOT EXISTS users (
+            user_id BIGSERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            region TEXT NOT NULL DEFAULT 'India',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_login_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            audit_id BIGSERIAL PRIMARY KEY,
+            timestamp TEXT NOT NULL,
+            user_id BIGINT,
+            email TEXT,
+            role TEXT,
+            action TEXT NOT NULL,
+            entity_type TEXT,
+            entity_id TEXT,
+            details_json TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS app_state (
+            state_key TEXT PRIMARY KEY,
+            value_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
+    else:
+        schema = """
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            region TEXT NOT NULL DEFAULT 'India',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_login_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            user_id INTEGER,
+            email TEXT,
+            role TEXT,
+            action TEXT NOT NULL,
+            entity_type TEXT,
+            entity_id TEXT,
+            details_json TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS app_state (
+            state_key TEXT PRIMARY KEY,
+            value_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
+
     with _connect() as conn:
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                email TEXT NOT NULL UNIQUE COLLATE NOCASE,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL,
-                is_active INTEGER NOT NULL DEFAULT 1,
-                region TEXT NOT NULL DEFAULT 'India',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                last_login_at TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS audit_logs (
-                audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL,
-                user_id INTEGER,
-                email TEXT,
-                role TEXT,
-                action TEXT NOT NULL,
-                entity_type TEXT,
-                entity_id TEXT,
-                details_json TEXT,
-                FOREIGN KEY(user_id) REFERENCES users(user_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS app_state (
-                state_key TEXT PRIMARY KEY,
-                value_json TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-            """
-        )
+        conn.executescript(schema)
 
         # Safe schema migration for users created by the previous real-app build.
         _ensure_column(conn, "users", "requested_role", "TEXT")
@@ -225,6 +341,7 @@ def init_database() -> None:
                     "password environment variables before starting the backend: "
                     + ", ".join(missing_bootstrap_passwords)
                 )
+
             for name, email, password, role, region, _env_name in seed_users:
                 conn.execute(
                     """
@@ -235,6 +352,7 @@ def init_database() -> None:
                         auth_provider,email_verified
                     )
                     VALUES (?,?,?,?,1,?,?,?,?, 'APPROVED','PASSWORD',1)
+                RETURNING user_id
                     """,
                     (
                         name,
@@ -312,7 +430,7 @@ def get_user_by_id(user_id: int) -> dict | None:
 def get_user_record_by_email(email: str) -> sqlite3.Row | None:
     with _connect() as conn:
         return conn.execute(
-            "SELECT * FROM users WHERE email=? COLLATE NOCASE",
+            "SELECT * FROM users WHERE " + ("LOWER(email)=LOWER(?)" if USE_POSTGRES else "email=? COLLATE NOCASE"),
             (email.strip(),),
         ).fetchone()
 
@@ -434,6 +552,7 @@ def create_user(
                     auth_provider,email_verified
                 )
                 VALUES (?,?,?,?,1,?,?,?,?, 'APPROVED','PASSWORD',1)
+                RETURNING user_id
                 """,
                 (
                     name.strip(),
@@ -446,9 +565,13 @@ def create_user(
                     role,
                 ),
             )
-            user_id = int(cursor.lastrowid)
-    except sqlite3.IntegrityError as exc:
-        raise ValueError("A user with that email already exists") from exc
+            user_id = int(cursor.fetchone()["user_id"])
+    except Exception as exc:
+        if USE_POSTGRES and psycopg is not None and isinstance(exc, psycopg.errors.UniqueViolation):
+            raise ValueError("A user with that email already exists") from exc
+        if not USE_POSTGRES and isinstance(exc, sqlite3.IntegrityError):
+            raise ValueError("A user with that email already exists") from exc
+        raise
 
     user = get_user_by_id(user_id)
     audit(
@@ -495,6 +618,7 @@ def register_user(
                     auth_provider,email_verified,phone,organization,state,district
                 )
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                RETURNING user_id
                 """,
                 (
                     name.strip(),
@@ -515,7 +639,7 @@ def register_user(
                     district.strip(),
                 ),
             )
-            user_id = int(cursor.lastrowid)
+            user_id = int(cursor.fetchone()["user_id"])
     except sqlite3.IntegrityError as exc:
         raise ValueError("An account with that email already exists") from exc
 
@@ -573,6 +697,7 @@ def register_google_user(
                     auth_provider,email_verified,phone,organization,state,district
                 )
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                RETURNING user_id
                 """,
                 (
                     name.strip(),
@@ -593,7 +718,7 @@ def register_google_user(
                     district.strip(),
                 ),
             )
-            user_id = int(cursor.lastrowid)
+            user_id = int(cursor.fetchone()["user_id"])
     except sqlite3.IntegrityError as exc:
         raise ValueError("An account with that email already exists") from exc
 

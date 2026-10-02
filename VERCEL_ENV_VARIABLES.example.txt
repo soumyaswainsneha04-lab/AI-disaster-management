@@ -1,0 +1,27 @@
+# Vercel / Neon
+DATABASE_URL=postgresql://<neon-user>:<password>@<neon-host>/<database>?sslmode=require
+DISASTER_AI_SECRET_KEY=<long-random-secret>
+
+# Bootstrap accounts (used only if the Postgres database is empty)
+DISASTER_AI_ADMIN_PASSWORD=<strong-admin-password>
+DISASTER_AI_COORDINATOR_PASSWORD=<strong-coordinator-password>
+DISASTER_AI_FIELD_PASSWORD=<strong-field-password>
+
+# Large artifact URLs
+DISASTER_AI_DATASET_URL=<direct-download-url-for-disaster_Dataset_FEATURED.csv>
+DISASTER_AI_FEATURES_URL=<direct-download-url-for-all_disaster_feature_names.txt>
+
+DISASTER_AI_MODEL_FLOOD_URL=<direct-download-url-for-resource_model_flood.pkl>
+DISASTER_AI_MODEL_CYCLONE_URL=<direct-download-url-for-resource_model_cyclone.pkl>
+DISASTER_AI_MODEL_EARTHQUAKE_URL=<direct-download-url-for-resource_model_earthquake.pkl>
+DISASTER_AI_MODEL_WILDFIRE_URL=<direct-download-url-for-resource_model_wildfire.pkl>
+DISASTER_AI_MODEL_LANDSLIDE_URL=<direct-download-url-for-resource_model_landslide.pkl>
+
+# Keep the reviewed frontend translation dictionary active.
+DISASTER_AI_ENABLE_LOCAL_TRANSLATION=0
+
+# Safer production CORS setting.
+DISASTER_AI_ALLOW_LAN_ORIGINS=false
+
+# Optional, only if Google sign-in is used.
+GOOGLE_CLIENT_ID=<your-google-client-id>
