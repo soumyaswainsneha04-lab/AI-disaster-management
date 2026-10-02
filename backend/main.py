@@ -496,6 +496,16 @@ RESOLVED_FEATURE_PATH = _resolve_features_path()
 
 df = pd.read_csv(RESOLVED_DATA_PATH).reset_index(drop=True)
 
+# Vercel Functions have a small writable /tmp filesystem. The deployed
+# dataset is needed in memory for the API, but the downloaded CSV file is not
+# needed after pandas has loaded it. Remove the temporary copy immediately so
+# large ML model downloads do not compete with the dataset for /tmp space.
+if IS_VERCEL and RESOLVED_DATA_PATH.parent == REMOTE_CACHE_DIR:
+    try:
+        RESOLVED_DATA_PATH.unlink()
+    except OSError:
+        pass
+
 with open(RESOLVED_FEATURE_PATH, "r", encoding="utf-8") as file:
     features = [line.strip() for line in file if line.strip()]
 
@@ -1075,7 +1085,23 @@ def get_model_for_disaster(disaster_type: str):
                 # and avoids spawning a large thread pool per API request.
                 cached.n_jobs = 1
 
-            models[disaster_type] = cached
+            # The model is now fully deserialized in RAM. On Vercel, keeping the
+            # downloaded model file in /tmp would consume hundreds of MB and
+            # prevent the next large model from loading. Remove remote copies
+            # after deserialization and let the request release the model.
+            if IS_VERCEL and path.parent == REMOTE_CACHE_DIR:
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+
+            # Local development benefits from model caching. On Vercel, avoid
+            # retaining multiple 100s-of-MB Random Forests in the same warm
+            # function instance. The current request keeps its model reference
+            # until prediction/explainability work completes.
+            if not IS_VERCEL:
+                models[disaster_type] = cached
+
             return cached
         except Exception as exc:
             raise HTTPException(
